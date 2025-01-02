@@ -1,145 +1,102 @@
-source: raw_medals is duckdb.table('Summer_olympic_Medals.csv' ) extend {
-    rename:
-        host_country is Host_country
-        host_city is Host_city
-        country_name is Country_Name
-        country_code is Country_Code
-        gold is Gold
-        silver is Silver
-        bronze is Bronze
-    dimension: 
-        is_host is pick 1 when country_name = host_country else 0 -- not sure about this
-        --is_host is country_name = host_country -- this was initial idea,how to count boolean values? 
-        olympic_year is `Year`::string
-              
+source: raw_medals is duckdb.table('Summer_olympic_Medals.csv') extend {
+  rename:
+    host_country is Host_country
+    host_city is Host_city
+    country_name is Country_Name
+    country_code is Country_Code
+    gold is Gold
+    silver is Silver
+    bronze is Bronze
+  dimension:
+    is_host is pick 1 when country_name = host_country else 0
+    olympic_year is `Year`::string
 }
 
 source: medals is raw_medals extend {
-    measure:
-      total_gold_medals is gold.sum()
-      total_silver_medals is silver.sum()
-      total_bronze_medals is bronze.sum()
-      total_medals is gold.sum() + silver.sum() + bronze.sum()
-      total_medal_points is gold.sum() * 3 + silver.sum() * 2 + bronze.sum()
-      times_hosted is sum(is_host)
+  measure:
+    total_gold_medals is gold.sum()
+    total_silver_medals is silver.sum()
+    total_bronze_medals is bronze.sum()
+    total_medals is gold.sum() + silver.sum() + bronze.sum()
+    total_medal_points is gold.sum() * 3 + silver.sum() * 2 + bronze.sum()
+    times_hosted is sum(is_host)
+    # percent
+    percentage_of_medals is total_medals / all(total_medals)
 
-
-    view: host_times_count is {
-      group_by: country_name
-      aggregate: times_hosted
-    }
-
-
-    view: year_country_top10_medals is {
-        group_by: 
-          `Olympic Year` is olympic_year
-          # list_detail
-          nest: Host is {
-            group_by: host_country, host_city
-          }
-        nest: `Country Stats` is {
-          top: 10
-          group_by: 
-            country_name
-            is_host is pick '✓' when is_host = 1 else '' -- nice touch to it :)
-          aggregate: 
-            total_medals
-            gold is total_gold_medals
-            silver is total_silver_medals
-            bronze is total_bronze_medals        
-        
-    }
-          order_by: `Olympic Year` desc
-
-       }
-
-
-
-
-    view: medals_total is {
-        aggregate:
-          gold is total_gold_medals
-          silver is total_silver_medals
-          bronze is total_bronze_medals
-          
-    }
-
-
-       view: total_medals_year is {
-          group_by: olympic_year
-          aggregate: 
-            total_medals
-            total_medal_points
-          order_by: olympic_year
-       }
-
-       view: total_gold_medals_year is {
-          group_by: olympic_year
-          aggregate: total_gold_medals
-          order_by: olympic_year 
-       }
-
-       view: total_silver_medals_year is {
-          group_by: olympic_year
-          aggregate: total_silver_medals
-          order_by: olympic_year   
-       }
-
-       view: total_bronze_medals_year is {
-          group_by: olympic_year
-          aggregate: total_bronze_medals 
-          order_by: olympic_year   
-       }
-
-
-
-      view: host_years is {
-          group_by: olympic_year
-          where: is_host = 1
-          order_by: olympic_year
+  view: year_country_top10_medals is {
+    group_by:
+      `Olympic Year` is olympic_year
+    aggregate: total_medals
+      # list_detail 
+      nest: Host is {
+        group_by: host_country, host_city
       }
-
-      view: best_worst_year is {
-          # list_detail
-          nest: best_year is {  // Add best_year view
-            group_by: olympic_year
-            aggregate: medals_this_year is total_medals
-            order_by: medals_this_year desc
-            limit: 1
-        } 
-         # list_detail
-        nest: worst_year is {  // Add worst_year view
-            group_by: olympic_year
-            aggregate: medals_this_year is total_medals
-            order_by: medals_this_year
-            limit: 1
-        }         
-      }
-
-  
-    view: country_dashboard is {
-        group_by: country_name
-        aggregate: 
-          total_medals
-          total_medal_points
-        nest: 
-        host is host_years
-        best_worst_year      
-        nest:
-            # line_chart
-            total_medals_year
-            
-            
-        
-
+    nest: `Country Stats` is {
+      top: 10
+      group_by:
+        country_name
+        is_host is pick '✓' when is_host = 1 else ''
+      aggregate:
+        percentage_of_medals
+        total_medals
+        gold is total_gold_medals
+        silver is total_silver_medals
+        bronze is total_bronze_medals
     }
+    order_by: `Olympic Year` desc
+  }
+
+  view: total_medals_year is {
+    group_by: olympic_year
+    aggregate:
+      total_medals
+    order_by: olympic_year
+  }
+
+  view: host is {
+    group_by: `Year` is olympic_year
+    where: is_host = 1
+    order_by: `Year`
+  }
+
+  # bar_chart
+    view: medals_type is {
+    group_by: country_name
+    # y
+    aggregate:
+      Gold is total_gold_medals
+      Silver is total_silver_medals
+      Bronze is total_bronze_medals
+  }
+
+
+-- best and worst year do not look Malloy-ish
+  view: country_view is {
+    group_by: country_name
+    nest:host
+    aggregate:
+      total_medals
+    # detail
+    nest: best_year is {
+      group_by:  `Year` is olympic_year
+      aggregate: 
+        # percent
+        `%` is percentage_of_medals
+      order_by: `%` desc
+      limit: 1
+      }
+      nest: worst_year is {
+      group_by: 
+      `Year`is olympic_year
+      aggregate: 
+        # percent
+        `% ` is percentage_of_medals
+      order_by: `% ` asc
+      limit: 1
+      }
+      nest:
+        # line_chart
+        total_medals_year
+        medals_type
+  }
 }
-
-
-
-----idea most countries that have hosted the olympics 
-
-
-
-
-
