@@ -74,8 +74,7 @@ source: medals is raw_medals extend {
   view: country_view is {
     group_by: country_name
     nest:host
-    aggregate:
-      total_medals
+
     # detail
     nest: best_year is {
       group_by:  `Year` is olympic_year
@@ -94,6 +93,8 @@ source: medals is raw_medals extend {
       order_by: `% ` asc
       limit: 1
       }
+      aggregate:
+      total_medals
       nest:
         # line_chart
         total_medals_year
