@@ -9,7 +9,8 @@ source: raw_medals is duckdb.table('Summer_olympic_Medals.csv') extend {
     bronze is Bronze
   dimension:
     is_host is pick 1 when country_name = host_country else 0
-    olympic_year is `Year`::string
+    # number = "####"
+    olympic_year is `Year`
 }
 
 source: medals is raw_medals extend {
@@ -25,6 +26,7 @@ source: medals is raw_medals extend {
 
   view: year_country_top10_medals is {
     group_by:
+      # number="####"
       `Olympic Year` is olympic_year
     aggregate: total_medals
       # list_detail 
@@ -54,7 +56,9 @@ source: medals is raw_medals extend {
   }
 
   view: host is {
-    group_by: `Year` is olympic_year
+    group_by: 
+      # number = "####"
+      `Year` is olympic_year
     where: is_host = 1
     order_by: `Year`
   }
@@ -73,31 +77,36 @@ source: medals is raw_medals extend {
 -- best and worst year do not look Malloy-ish
   view: country_view is {
     group_by: country_name
-    nest:host
+    # list
+    nest: `Host Years` is host
 
-    # detail
-    nest: best_year is {
-      group_by:  `Year` is olympic_year
+    # list_detail
+    nest: `Best Year(percent of medals)` is {
+      group_by:  
+        # number = "####"
+        `Year` is olympic_year
       aggregate: 
         # percent
         `%` is percentage_of_medals
       order_by: `%` desc
       limit: 1
-      }
-      nest: worst_year is {
+    }
+    # list_detail
+    nest: `Worst Year(percent of medals)` is {
       group_by: 
-      `Year`is olympic_year
+        # number = "####"
+        `Year`is olympic_year
       aggregate: 
         # percent
         `% ` is percentage_of_medals
       order_by: `% ` asc
       limit: 1
-      }
-      aggregate:
-      total_medals
-      nest:
-        # line_chart
-        total_medals_year
-        medals_type
+    }
+    aggregate:
+    total_medals
+    nest:
+      # line_chart
+      total_medals_year
+      medals_type
   }
 }
