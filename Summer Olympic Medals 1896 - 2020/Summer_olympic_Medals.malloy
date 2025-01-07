@@ -56,7 +56,6 @@ source: medals is raw_medals extend {
   }
 
   view: host is {
-    # number = "####"
     group_by: `Year` is olympic_year
     where: is_host = 1
     order_by: `Year`
@@ -76,11 +75,10 @@ source: medals is raw_medals extend {
 -- best and worst year do not look Malloy-ish
   view: country_view is {
     group_by: country_name
-    # list
     nest:host
 
-    # list_detail
-    nest: `Best Year(percent of medals)` is {
+    # detail
+    nest: best_year is {
       group_by:  `Year` is olympic_year
       aggregate: 
         # percent
@@ -88,21 +86,21 @@ source: medals is raw_medals extend {
       order_by: `%` desc
       limit: 1
       }
-      # list_detail
-      nest: `Worst Year(percent of medals)` is {
+      nest: worst_year is {
       group_by: 
-      `Year`is olympic_year
+        # number = "####"
+        `Year`is olympic_year
       aggregate: 
         # percent
         `% ` is percentage_of_medals
       order_by: `% ` asc
       limit: 1
-      }
-      aggregate:
-      total_medals
-      nest:
-        # line_chart
-        total_medals_year
-        medals_type
+    }
+    aggregate:
+    total_medals
+    nest:
+      # line_chart
+      total_medals_year
+      medals_type
   }
 }

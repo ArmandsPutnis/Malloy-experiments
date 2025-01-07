@@ -1,0 +1,117 @@
+
+// This file defines sources for various tables in the jaffle shop dataset using DuckDB.
+
+
+## Customer data with basic cleaning and transformation applied, one row per customer.
+source: stg_customers is duckdb.table('raw_customers.csv') extend {
+    rename: 
+      customer_id is id
+      customer_name is name
+    primary_key: customer_id
+}
+
+
+## List of open locations with basic cleaning and transformation applied, one row per location.
+source: stg_locations is duckdb.table('raw_stores.csv') extend {
+    rename: 
+     location_id is id
+     location_name is name
+    measure: avarage_tax_rate is avg(tax_rate)
+    primary_key: location_id
+          
+}
+
+## Order data with basic cleaning and transformation applied, one row per order.
+source: stg_orders is duckdb.table('raw_orders.csv') extend {
+    rename:
+      order_id is id
+      location_id is store_id
+      customer_id is customer
+      subtotal_cents is subtotal
+      tax_paid_cents is tax_paid
+      order_total_cents is order_total
+
+    dimension:
+      # currency
+      subtotal_dollars is subtotal_cents / 100
+      # currency
+      tax_paid_dollars is tax_paid_cents / 100
+      # currency
+      order_total_dollars is order_total_cents / 100
+    measure:
+      count_lifetime_orders is count(order_id)
+      is_repeat_buyer is count(order_id) > 1
+      customer_type is pick 'retuning' when count(order_id) > 1  else 'new'
+      first_order_at is min(ordered_at)
+      last_order_at is max(ordered_at)
+      lifetime_spend_pretax is sum(subtotal_dollars) 
+      lifetime_spend is sum(order_total_dollars)
+      lifetime_tax_paid is sum(tax_paid_dollars)
+    primary_key: order_id
+    join_one: stg_customers with customer_id
+
+view: customers is {
+    group_by: stg_customers.customer_id, stg_customers.customer_name
+    aggregate:
+      count_lifetime_orders
+      first_order_at
+      last_order_at
+      lifetime_spend_pretax
+      lifetime_tax_paid
+      lifetime_spend
+      is_repeat_buyer
+      customer_type
+}
+}
+## List of our supply expenses data with basic cleaning and transformation applied. 
+## One row per supply cost, not per supply. As supply costs fluctuate they receive a new row with a new UUID. Thus there can be multiple rows per supply_id.
+source: stg_supplies is duckdb.table('raw_supplies.csv') extend {
+    rename:
+      supply_id is id
+      product_id is sku
+      supply_name is name
+      is_perishable_supply is perishable
+      supply_cost_cents is cost
+    dimension: 
+      supply_uuid is hash!(supply_id, product_id)
+      # currency
+      supply_cost_dollars is supply_cost_cents / 100
+    measure: 
+      total_supply_cost is sum(supply_cost_dollars)
+    primary_key: product_id
+
+    view: order_supplies_summary  is {
+        group_by: product_id
+        aggregate: total_supply_cost
+        
+    }
+
+}   
+## Product (food and drink items that can be ordered) data with basic cleaning and transformation applied, one row per product.
+source: stg_products is duckdb.table('raw_products.csv') extend {
+    rename:
+      product_id is sku
+      product_type is type
+      product_description is description
+      price_cents is price
+    
+    dimension: 
+      price_dollars is price_cents / 100
+      is_food_item is product_type = 'jaffle'
+      is_drink_item is product_type = 'beverage'
+    measure: total_product_count is count(product_id)
+    primary_key: product_id
+    join_one: stg_supplies with product_id
+      
+}
+
+## Individual food and drink items that make up our orders, one row per item.
+source: stg_order_items is duckdb.table('raw_items.csv') extend {
+    rename:
+      order_item_id is id
+      product_id is sku
+      primary_key: order_item_id
+
+      join_one: stg_orders with order_id
+      join_one: stg_products with product_id
+}
