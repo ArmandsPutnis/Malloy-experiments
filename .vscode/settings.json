@@ -1,0 +1,11 @@
+{
+    "sqltools.connections": [
+        {
+            "previewLimit": 50,
+            "driver": "DuckDB",
+            "database": "duckdb",
+            "name": "chdb"
+        }
+    ],
+    "sqltools.useNodeRuntime": true
+}
